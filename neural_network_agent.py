@@ -10,7 +10,7 @@ from keras.metrics import mean_squared_error
 keras.utils.disable_interactive_logging()
 
 class ClubAgent:
-    def __init__(self, state_size, output_size, episodeLength):
+    def __init__(self, state_size, output_size, episodeLength, numHiddenLayers, LRInitial, LRDecay):
         self.num_actions = output_size
         self.n_actions = self.num_actions
         #some hyperparameters:
@@ -20,7 +20,6 @@ class ClubAgent:
         # exploration_proba - initial exploration probability
         # exploration_proba_decay - decay of exploration probability
         # batch_size - size of experiences we sample to train the DNN
-        self.lr = 0.05
         self.gamma = 0.99
         self.exploration_proba = 1
         self.exploration_proba_decay = 0.03
@@ -29,18 +28,23 @@ class ClubAgent:
         self.memory_buffer = []
         self.memory_buffer_reward = []
         self.max_memory_buffer = episodeLength
+        self.lr_schedule = keras.optimizers.schedules.ExponentialDecay(LRInitial,decay_steps=self.batch_size,decay_rate=LRDecay)
+
 
         #create model having two hidden layers of 12 neurons
         #the first layer has the same size as state size
         #the last layer has the size of the action space
         self.model = Sequential([
             Dense(units=5, input_dim = state_size, activation = 'relu'),
-            Dense(units=4, activation = 'relu'),
-            Dense(units=3, activation = 'relu'),
             # Dense(units=4, activation = 'relu'),
-            Dense(units=self.n_actions, activation = 'linear')
+            # Dense(units=3, activation = 'relu'),
+            # Dense(units=4, activation = 'relu'),
+            # Dense(units=self.n_actions, activation = 'linear')
         ])
-        self.model.compile(loss = Huber(), optimizer = Adam(learning_rate = self.lr))
+        for i in range(numHiddenLayers):
+            self.model.add(Dense(units=6, activation = 'relu'))
+        self.model.add(Dense(units=self.n_actions, activation = 'linear'))
+        self.model.compile(loss = Huber(), optimizer = Adam(learning_rate = self.lr_schedule))
 
     def getProb(self):
         return self.exploration_proba

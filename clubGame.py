@@ -5,9 +5,14 @@ import pathlib
 import numpy as np
 
 class Game:
-    def __init__(self):
+    def __init__(self, numHiddenLayers, LRInitial, LRDecay):
         
+        #
         #                               parameters
+        #
+        self.numHiddenLayers = numHiddenLayers
+        self.LRInitial = LRInitial
+        self.LRDecay = LRDecay
         self.gameSpeed = 1
         self.maxfps = 60
         self.printScreen = True
@@ -27,7 +32,6 @@ class Game:
         #
         #                               link up DNN to game
         #
-        self.trialName = "normalized"
         self.loading = False
         self.saveFrequency = 50
         episodeLength = 300
@@ -37,22 +41,31 @@ class Game:
         self.rewardVal = 1
         self.rewardThreshhold = 8
         self.output_size = 2
-        self.agent = ClubAgent(state_size, self.output_size, episodeLength)
+        self.agent = ClubAgent(state_size, self.output_size, episodeLength, numHiddenLayers, LRInitial, LRDecay)
         self.total_steps = 0
         self.numEpisodes = 0
+        self.maxEpisodes = 500
         self.numsave = 0
         self.averageMemory = []
         self.memBuffer = 20
 
 
-        pathlib.Path(self.trialName+"/").mkdir(exist_ok=True) 
+        path = "trainingData/"
+        pathlib.Path(path).mkdir(exist_ok=True) 
+        path = path + str(numHiddenLayers)+" hidden layers/"
+        pathlib.Path(path).mkdir(exist_ok=True)
+        path = path + str(LRInitial) + " initial learning rate/"
+        pathlib.Path(path).mkdir(exist_ok=True)
+        self.path = path + str(LRDecay) + " learning rate deacay/"
+        pathlib.Path(self.path).mkdir(exist_ok=True)
+
+
         #
         # OPTIONAL: Load previous weights
         #
-        
         if self.loading == True:
             self.numsave = 2
-            checkpoint_path = "./normalized/checkpoint"+str(self.numsave)
+            checkpoint_path = self.path + "checkpoint"+str(self.numsave)
             self.numEpisodes = self.numsave * self.saveFrequency
             self.agent.model.load_weights(checkpoint_path)
             # pick one or the other:
@@ -61,12 +74,14 @@ class Game:
         else:
             self.numsave = 0
             #Saving the parameters
-            with open(self.trialName+"/LOG.txt", "a+") as f:
+            with open(self.path+"LOG.txt", "w") as f:
+                    f.write("Num hidden layers = "+str(numHiddenLayers) + "\n")
                     f.write("Reward = "+str(self.rewardVal) + "\n")
                     f.write("Reward region = "+str(self.rewardThreshhold) + "\n")
                     f.write("Output size = "+str(self.output_size) + "\n")
                     f.write("Input size = "+str(state_size) + "\n")
-                    f.write("learning rate = "+str(self.agent.lr)+ "\n")
+                    f.write("learning rate initial = "+str(LRInitial)+ "\n")
+                    f.write("learning rate decay = "+str(LRDecay)+ "\n")
                     f.write("gamma = "+str(self.agent.gamma)+"\n")
                     f.write("random chance = "+str(self.agent.exploration_proba)+"\n")
                     f.write("random decay = "+str(self.agent.exploration_proba_decay)+"\n")
@@ -104,7 +119,7 @@ class Game:
                     
     def simulation(self): #                       MAIN FUNCTION
         
-        while True: #               looping episodes
+        for i in range(self.maxEpisodes): #               looping episodes
 
             self.reset()
             current_state = 0
@@ -203,6 +218,7 @@ class Game:
 
                 if self.printScreen == True:
                     
+                    #
                     #                           draw the current frame
                     # 
                     self.screen.fill("black") #overrite previous frame
@@ -224,7 +240,7 @@ class Game:
             else:
                 self.averageMemory[self.numEpisodes % self.memBuffer] = accuracy
             episodeAvg = float(sum(self.averageMemory)) / float(self.averageMemory.__len__())
-            with open(self.trialName+"/LOG.txt", "a+") as f:
+            with open(self.path+"LOG.txt", "a+") as f:
                 f.write("accuracy: "+str(round(accuracy, 3))+"  in episode "+ str(self.numEpisodes)+" and  "+str(round(episodeAvg, 3))+" in last "+ str(self.averageMemory.__len__())+" episodes   random prob: "+ str(round(self.agent.getProb() * 100, 3))+"\n")
             if (self.agent.getProb() < 0.01):
                 self.agent.disableRandom()
@@ -233,13 +249,23 @@ class Game:
             #Saving the model's weights
             if (self.numEpisodes % self.saveFrequency == 0):
                 self.numsave += 1
-                checkpoint_path = "./"+self.trialName+"/checkpoint"+str(self.numsave)
+                checkpoint_path = "./"+self.path+"checkpoint"+str(self.numsave)
                 self.agent.model.save_weights(checkpoint_path)
-                with open(self.trialName+"/LOG.txt", "a+") as f:
+                with open(self.path+"LOG.txt", "a+") as f:
                     f.write("Saved! -- checkpoint "+ str(self.numsave)+"\n")
 
             self.agent.train()
             self.agent.update_exploration_probability()
         
-game = Game()
-game.simulation()
+def main():
+    
+    for i in range (3):
+            numHiddenLayers = i+3
+            for j in range(6):
+                LRInitial = 1.5 + (0.5*j)
+                for k in range(5):
+                    LRDecay = 0.99 - (0.01*k)
+                    game = Game(numHiddenLayers, LRInitial, LRDecay)
+                    game.simulation()
+
+main()
